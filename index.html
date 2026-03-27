@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> 變粗阿</title>
+    <title>變粗阿</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // --- 驗證 ---
@@ -23,18 +23,21 @@
         h2 { color: var(--main); margin-top: 0; font-size: 1.2rem; border-left: 4px solid var(--main); padding-left: 10px; }
         .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
         
-        /* 基本按鈕 */
         button { background: #333; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-size: 1rem; transition: 0.3s; }
-        
-        /* 橘色強調按鈕 */
         button.action, .btn-orange { background: var(--main); font-weight: bold; }
-        
-        /* 休息按鈕選中樣式 */
         .rest-opt.active { background: var(--main) !important; color: white !important; box-shadow: 0 0 10px var(--main); }
 
-        input, select { background: #000000; border: 1px solid #475569; color: white; padding: 10px; border-radius: 8px; width: 100%; box-sizing: border-box; }
+        input, select, textarea { background: #000000; border: 1px solid #475569; color: white; padding: 10px; border-radius: 8px; width: 100%; box-sizing: border-box; }
+        textarea { font-family: inherit; resize: none; height: 120px; border: 1px solid #333; margin-bottom: 10px; }
         canvas { background: #000000; border-radius: 10px; padding: 10px; margin-top: 10px; border: 1px solid #222; }
         .timer-display { font-size: 2.5rem; text-align: center; font-family: monospace; color: var(--main); margin: 10px 0; }
+        .status-msg { color: #4ade80; font-size: 0.9rem; text-align: center; margin-top: 8px; font-weight: bold; }
+
+        /* 歷史紀錄彈窗樣式 */
+        #history-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:100; overflow-y:auto; padding:20px; box-sizing:border-box; }
+        .history-content { background:#111; border:1px solid #ff4d00; border-radius:15px; padding:20px; max-width:500px; margin:auto; }
+        .history-item { border-bottom:1px solid #333; padding:10px 0; font-size:0.9rem; }
+        .history-date { color:var(--main); font-weight:bold; margin-bottom:5px; }
     </style>
 </head>
 <body>
@@ -78,6 +81,17 @@
     </div>
 
     <div class="section">
+        <h2>📝 今日訓練紀錄</h2>
+        <textarea id="workout-log" placeholder="在此紀錄動作、重量與組數..."></textarea>
+        <div class="btn-grid">
+            <button onclick="saveLog()" class="btn-orange">💾 儲存紀錄</button>
+            <button onclick="viewHistory()">📂 歷史紀錄</button>
+            <button onclick="clearCurrentLog()" style="background:#450a0a;">🧹 清除輸入</button>
+        </div>
+        <div id="log-status" class="status-msg" style="display:none;">✅ 紀錄已成功儲存！</div>
+    </div>
+
+    <div class="section">
         <h2>🥚 營養與提醒</h2>
         <div style="display:flex; gap:10px; margin-bottom:15px;">
             <select id="food">
@@ -108,8 +122,76 @@
     </div>
 </div>
 
+<div id="history-modal">
+    <div class="history-content">
+        <h2 style="border:none; text-align:center;">📜 訓練歷史總覽</h2>
+        <div id="history-list"></div>
+        <button onclick="closeHistory()" class="btn-orange" style="width:100%; margin-top:20px;">關閉</button>
+        <button onclick="fullResetLogs()" style="background:#450a0a; width:100%; margin-top:10px; font-size:0.8rem;">危險：清空所有歷史</button>
+    </div>
+</div>
+
 <script>
-    // --- 體重圖表邏輯 ---
+    // --- 初始化讀取 ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const currentLog = localStorage.getItem('currentWorkoutLog');
+        if (currentLog) document.getElementById('workout-log').value = currentLog;
+    });
+
+    // --- 訓練日誌邏輯 ---
+    function saveLog() {
+        const text = document.getElementById('workout-log').value;
+        if(!text.trim()) { alert("請先輸入內容喔！"); return; }
+        
+        // 1. 儲存目前的草稿
+        localStorage.setItem('currentWorkoutLog', text);
+        
+        // 2. 儲存到歷史紀錄 (陣列形式)
+        let history = JSON.parse(localStorage.getItem('workoutHistory')) || [];
+        const date = new Date().toLocaleString();
+        history.unshift({ date: date, content: text }); // 新的排在前面
+        localStorage.setItem('workoutHistory', JSON.stringify(history));
+
+        const status = document.getElementById('log-status');
+        status.style.display = 'block';
+        setTimeout(() => { status.style.display = 'none'; }, 2000);
+    }
+
+    function clearCurrentLog() {
+        if(confirm("確定要清除「目前」輸入的內容嗎？(歷史紀錄不會消失)")) {
+            document.getElementById('workout-log').value = "";
+            localStorage.removeItem('currentWorkoutLog');
+        }
+    }
+
+    function viewHistory() {
+        const history = JSON.parse(localStorage.getItem('workoutHistory')) || [];
+        const listDiv = document.getElementById('history-list');
+        listDiv.innerHTML = history.length === 0 ? "<p style='text-align:center; color:#666;'>尚無歷史紀錄</p>" : "";
+        
+        history.forEach(item => {
+            listDiv.innerHTML += `
+                <div class="history-item">
+                    <div class="history-date">${item.date}</div>
+                    <div style="white-space: pre-wrap;">${item.content}</div>
+                </div>
+            `;
+        });
+        document.getElementById('history-modal').style.display = 'block';
+    }
+
+    function closeHistory() {
+        document.getElementById('history-modal').style.display = 'none';
+    }
+
+    function fullResetLogs() {
+        if(confirm("這會刪除你「所有」過去的訓練紀錄！確定嗎？")) {
+            localStorage.removeItem('workoutHistory');
+            viewHistory();
+        }
+    }
+
+    // --- 體重圖表邏輯 (其餘保持不變) ---
     let weightData = JSON.parse(localStorage.getItem('weights')) || [];
     let weightLabels = JSON.parse(localStorage.getItem('weightDates')) || [];
     const ctx = document.getElementById('weightChart').getContext('2d');
@@ -127,19 +209,16 @@
         const w = document.getElementById('weight-input').value;
         if(!w) return;
         const date = new Date().toLocaleDateString();
-        weightData.push(w);
-        weightLabels.push(date);
+        weightData.push(w); weightLabels.push(date);
         localStorage.setItem('weights', JSON.stringify(weightData));
         localStorage.setItem('weightDates', JSON.stringify(weightLabels));
-        chart.update();
-        document.getElementById('weight-input').value = "";
+        chart.update(); document.getElementById('weight-input').value = "";
     }
 
     function clearWeight() {
-        if(confirm("確定要清空紀錄嗎？")) { localStorage.removeItem('weights'); localStorage.removeItem('weightDates'); location.reload(); }
+        if(confirm("確定要清空體重紀錄嗎？")) { localStorage.removeItem('weights'); localStorage.removeItem('weightDates'); location.reload(); }
     }
 
-    // --- 訓練與計時邏輯 ---
     function showWorkout(p) {
         const data = {
             shoulders: "推薦：啞鈴肩推、側平舉。重點：側三角加寬！",
@@ -163,38 +242,24 @@
         } else { clearInterval(tInt); btn.innerText = "開始訓練"; btn.style.background = "var(--main)"; }
     }
 
-    // --- 休息倒數邏輯 ---
     let rInt;
     function startRest(s, btn) {
         clearInterval(rInt);
-        // 按鈕切換顏色
         document.querySelectorAll('.rest-opt').forEach(b => b.classList.remove('active'));
         if(btn) btn.classList.add('active');
-
-        let l = s;
-        document.getElementById('rest-sec').innerText = l;
+        let l = s; document.getElementById('rest-sec').innerText = l;
         rInt = setInterval(() => {
             l--; document.getElementById('rest-sec').innerText = l;
-            if(l<=0) { 
-                clearInterval(rInt); 
-                alert("休息結束！開練！"); 
-                resetRestUI(); 
-            }
+            if(l<=0) { clearInterval(rInt); alert("休息結束！開練！"); resetRestUI(); }
         }, 1000);
     }
 
-    function cancelRest() {
-        clearInterval(rInt);
-        alert("已取消休息");
-        resetRestUI();
-    }
-
+    function cancelRest() { clearInterval(rInt); alert("已取消休息"); resetRestUI(); }
     function resetRestUI() {
         document.getElementById('rest-sec').innerText = "60";
         document.querySelectorAll('.rest-opt').forEach(b => b.classList.remove('active'));
     }
 
-    // --- 營養與提醒 ---
     function calcP() {
         const r = document.getElementById('food').value, w = document.getElementById('food-w').value;
         document.getElementById('p-res').innerText = `攝取量：${(r*w).toFixed(1)} g 蛋白質`;
