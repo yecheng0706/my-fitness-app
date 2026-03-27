@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> 變粗阿</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // --- 驗證 ---
+        (function() {
+            var pass = prompt("身分驗證：請輸入您的密碼以進入");
+            if (pass !== "1234") {
+                alert("驗證失敗！");
+                window.location.href = "https://www.google.com/search?q=%E7%AC%91%E6%AD%BB";
+            }
+        })();
+    </script>
+    <style>
+        :root { --main: #ff4d00; --accent: #ff6622; --bg: #000000; --card: #111111; --text: #ffffff; }
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; margin: 0; padding: 15px; padding-bottom: 50px; }
+        .container { max-width: 600px; margin: auto; }
+        .section { background: var(--card); padding: 20px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(255, 77, 0, 0.1); }
+        h2 { color: var(--main); margin-top: 0; font-size: 1.2rem; border-left: 4px solid var(--main); padding-left: 10px; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
+        
+        /* 基本按鈕 */
+        button { background: #333; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-size: 1rem; transition: 0.3s; }
+        
+        /* 橘色強調按鈕 */
+        button.action, .btn-orange { background: var(--main); font-weight: bold; }
+        
+        /* 休息按鈕選中樣式 */
+        .rest-opt.active { background: var(--main) !important; color: white !important; box-shadow: 0 0 10px var(--main); }
+
+        input, select { background: #000000; border: 1px solid #475569; color: white; padding: 10px; border-radius: 8px; width: 100%; box-sizing: border-box; }
+        canvas { background: #000000; border-radius: 10px; padding: 10px; margin-top: 10px; border: 1px solid #222; }
+        .timer-display { font-size: 2.5rem; text-align: center; font-family: monospace; color: var(--main); margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="section">
+        <h2>📈 體重紀錄圖表</h2>
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
+            <input type="number" id="weight-input" step="0.1" placeholder="今日體重 (kg)">
+            <button onclick="addWeight()" class="btn-orange" style="width:100px;">紀錄</button>
+            <button onclick="clearWeight()" style="background:#450a0a; width:80px;">清空</button>
+        </div>
+        <canvas id="weightChart"></canvas>
+    </div>
+
+    <div class="section">
+        <h2>🏋️ 訓練導航</h2>
+        <div class="btn-grid">
+            <button onclick="showWorkout('shoulders')" class="btn-orange">肩膀重點</button>
+            <button onclick="showWorkout('chest')" class="btn-orange">胸部訓練</button>
+            <button onclick="showWorkout('back')" class="btn-orange">背部開發</button>
+            <button onclick="showWorkout('legs')" class="btn-orange">下肢力量</button>
+        </div>
+        <div id="workout-detail" style="background:#000; padding:15px; border-radius:10px; border: 1px solid #222;">選擇部位開始...</div>
+    </div>
+
+    <div class="section">
+        <h2>⏱️ 訓練與休息</h2>
+        <div id="main-timer" class="timer-display">00:00:00</div>
+        <div class="btn-grid">
+            <button onclick="toggleTimer()" id="timer-btn" class="btn-orange">開始訓練</button>
+            <button onclick="cancelRest()" style="background:#450a0a;">取消休息</button>
+        </div>
+        <p style="text-align:center; font-size: 1.2rem;">剩餘休息時間：<span id="rest-sec" style="color:var(--main); font-weight:bold;">60</span> 秒</p>
+        <div class="btn-grid">
+            <button class="rest-opt" onclick="startRest(30, this)">30s (輕)</button>
+            <button class="rest-opt" onclick="startRest(60, this)">60s (中)</button>
+            <button class="rest-opt" onclick="startRest(120, this)">120s (強)</button>
+            <button class="rest-opt" onclick="startRest(300, this)">300s (極限)</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🥚 營養與提醒</h2>
+        <div style="display:flex; gap:10px; margin-bottom:15px;">
+            <select id="food">
+                <optgroup label="原型食物">
+                    <option value="0.23">雞胸肉 (100g)</option>
+                    <option value="0.25">牛肉 (100g)</option>
+                    <option value="0.13">雞蛋 (100g)</option>
+                    <option value="0.20">鮭魚 (100g)</option>
+                </optgroup>
+                <optgroup label="超商與補給">
+                    <option value="0.28">即食雞胸 (份)</option>
+                    <option value="0.05">無糖豆漿 (瓶)</option>
+                    <option value="0.20">乳清蛋白 (匙)</option>
+                    <option value="0.10">蛋白棒 (條)</option>
+                </optgroup>
+            </select>
+            <input type="number" id="food-w" placeholder="重量(g)" oninput="calcP()">
+        </div>
+        <p id="p-res" style="color:#4ade80; font-weight:bold; font-size:1.2rem; text-align:center;">攝取量：0 g</p>
+        <hr style="border:0.5px solid #222; margin:15px 0;">
+        <button onclick="askPermission()" class="btn-orange" style="width:100%; margin-bottom:10px;">1. 開啟通知權限</button>
+        <div class="btn-grid">
+            <button onclick="setRemind(10)">10分鐘後</button>
+            <button onclick="setRemind(30)">30分鐘後</button>
+            <button onclick="setRemind(60)">1小時後</button>
+            <button onclick="setRemind(0.1)">6秒測試</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 體重圖表邏輯 ---
+    let weightData = JSON.parse(localStorage.getItem('weights')) || [];
+    let weightLabels = JSON.parse(localStorage.getItem('weightDates')) || [];
+    const ctx = document.getElementById('weightChart').getContext('2d');
+    Chart.defaults.color = '#fff';
+    let chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: weightLabels,
+            datasets: [{ label: '體重 (kg)', data: weightData, borderColor: '#ff4d00', tension: 0.3, borderWidth: 3 }]
+        },
+        options: { scales: { y: { grid: {color:'#222'} }, x: { grid: {color:'#222'} } } }
+    });
+
+    function addWeight() {
+        const w = document.getElementById('weight-input').value;
+        if(!w) return;
+        const date = new Date().toLocaleDateString();
+        weightData.push(w);
+        weightLabels.push(date);
+        localStorage.setItem('weights', JSON.stringify(weightData));
+        localStorage.setItem('weightDates', JSON.stringify(weightLabels));
+        chart.update();
+        document.getElementById('weight-input').value = "";
+    }
+
+    function clearWeight() {
+        if(confirm("確定要清空紀錄嗎？")) { localStorage.removeItem('weights'); localStorage.removeItem('weightDates'); location.reload(); }
+    }
+
+    // --- 訓練與計時邏輯 ---
+    function showWorkout(p) {
+        const data = {
+            shoulders: "推薦：啞鈴肩推、側平舉。重點：側三角加寬！",
+            chest: "推薦：臥推、飛鳥。注意：挺胸收胛。",
+            back: "推薦：划船、下拉。感受背肌拉伸。",
+            legs: "推薦：深蹲、推腿。核心收緊。"
+        };
+        document.getElementById('workout-detail').innerHTML = `<span style="color:var(--main); font-weight:bold;">${data[p]}</span>`;
+    }
+
+    let time = 0, tInt;
+    function toggleTimer() {
+        const btn = document.getElementById('timer-btn');
+        if(btn.innerText === "開始訓練") {
+            tInt = setInterval(() => {
+                time++;
+                let h=Math.floor(time/3600), m=Math.floor((time%3600)/60), s=time%60;
+                document.getElementById('main-timer').innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+            }, 1000);
+            btn.innerText = "停止"; btn.style.background = "#450a0a";
+        } else { clearInterval(tInt); btn.innerText = "開始訓練"; btn.style.background = "var(--main)"; }
+    }
+
+    // --- 休息倒數邏輯 ---
+    let rInt;
+    function startRest(s, btn) {
+        clearInterval(rInt);
+        // 按鈕切換顏色
+        document.querySelectorAll('.rest-opt').forEach(b => b.classList.remove('active'));
+        if(btn) btn.classList.add('active');
+
+        let l = s;
+        document.getElementById('rest-sec').innerText = l;
+        rInt = setInterval(() => {
+            l--; document.getElementById('rest-sec').innerText = l;
+            if(l<=0) { 
+                clearInterval(rInt); 
+                alert("休息結束！開練！"); 
+                resetRestUI(); 
+            }
+        }, 1000);
+    }
+
+    function cancelRest() {
+        clearInterval(rInt);
+        alert("已取消休息");
+        resetRestUI();
+    }
+
+    function resetRestUI() {
+        document.getElementById('rest-sec').innerText = "60";
+        document.querySelectorAll('.rest-opt').forEach(b => b.classList.remove('active'));
+    }
+
+    // --- 營養與提醒 ---
+    function calcP() {
+        const r = document.getElementById('food').value, w = document.getElementById('food-w').value;
+        document.getElementById('p-res').innerText = `攝取量：${(r*w).toFixed(1)} g 蛋白質`;
+    }
+
+    function askPermission() {
+        Notification.requestPermission().then(p => { if(p==='granted') alert("通知權限已開啟！"); });
+    }
+
+    function setRemind(m) {
+        let ms = m < 1 ? (m*60)+" 秒" : m+" 分鐘";
+        alert(ms + " 後提醒你！");
+        setTimeout(() => { new Notification("🔥 健身時間到！", {body: "肩膀是不會自己變寬的，快動起來！"}); }, m * 60 * 1000);
+    }
+</script>
+</body>
+</html>
